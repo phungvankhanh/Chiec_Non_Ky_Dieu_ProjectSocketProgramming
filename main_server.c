@@ -17,7 +17,7 @@
 struct game current_game;
 
 void addUser(client_message *argp) {
-   FILE *fp = fopen("./user.db","a+");
+   FILE *fp = fopen("./database/user.db","a+");
    if(fp != NULL) {
        char data[517]  = "";
        strcpy(data,argp->current_user.name);
@@ -33,24 +33,73 @@ struct Quiz get_the_quiz() {
   struct Quiz quiz;
   char question[100];
   char answer[100];
-  char *temp;
+  char temp[100];
   char *tokens;
-  FILE *fp = fopen("./quiz.db","r");
+  char line[100];
+  FILE *fp = fopen("./database/quiz.db","r");
   if(fp!=NULL) {
-    if (fgets(temp, 100, fp) != NULL) {
-      tokens = strtok(temp, DELIMITER);
-      if (tokens != NULL) {
-        strcpy(quiz.question, tokens);
-      }
-      tokens = strtok(NULL,DELIMITER);
-      tokens[strlen(tokens)-1] = '\0';
-      if (tokens != NULL) {
-        strcpy(quiz.answer, tokens);
+    if (fgets(temp, 100, fp)!=NULL) {
+      strcpy(line,temp);
+      while (fgets(temp, 100, fp) != NULL) {
+        if (rand()%2 == 0) strcpy(line,temp);
       }
     }
     fclose(fp);
+  } else printf("open file error\n");
+  tokens = strtok(line, DELIMITER);
+  if (tokens != NULL) {
+    strcpy(quiz.question, tokens);
+  }
+  tokens = strtok(NULL,DELIMITER);
+  tokens[strlen(tokens)-1] = '\0';
+  if (tokens != NULL) {
+    strcpy(quiz.answer, tokens);
   }
   return quiz;
+}
+
+char * setdefaultAnswer(char* answer) {
+  int i;
+  char *defaultAnswer = answer;
+  for (i=0;i<strlen(answer);i++) {
+    if (defaultAnswer[i]!=' ') {
+      defaultAnswer[i] = '*';
+    }
+  }
+  return defaultAnswer;
+}
+
+char lower_to_upper(char lower) {
+  char upper;
+  if (lower >= 'a' && lower <= 'z') {
+    upper = ('A' + lower - 'a');
+    return upper;
+  }
+  else return lower;
+}
+
+int get_score(int spin_code, int score){
+  switch (spin_code) {
+		case 0:
+		case 1:
+		case 2:
+		case 3:
+		case 4:
+		case 5:
+		case 6:
+		case 7:
+		case 8:
+		case 9:
+      score+=(spin_code+1)*100;
+      return score;
+		case 10: return score*=2;
+		case 11: return score/=2;
+		case 12: printf("You got the Mat luot\n"); break;
+		case 13: printf("You got the Them luot\n"); break;
+		case 14: printf("You got the May man\n"); break;
+		default: break;
+	}
+  return current_game.joiners[0].score;
 }
 
 server_message *
@@ -95,17 +144,18 @@ join_1_svc(client_message *argp, struct svc_req *rqstp)
   result.current_game.status = GAME_RUNNING;
   struct Quiz quiz = get_the_quiz();
   result.current_game.quiz = quiz;
-  strcpy(result.current_game.answerAtMoment, "hoathi");
+  strcpy(result.current_game.answerAtMoment, setdefaultAnswer(quiz.answer));
   result.current_game.joiners[0].user = argp->current_user;
   result.current_game.joiners[0].score = 0;
   result.current_game.joiners[0].in_game = PLAYING_GAME;
+  current_game = result.current_game;
 	return &result;
 }
 
 server_message *
 spin_1_svc(client_message *argp, struct svc_req *rqstp)
 {
-	static server_message  result;
+  static server_message result;
 	result.opcode = rand()%15;
 	return &result;
 }
@@ -126,11 +176,37 @@ server_message *
 guess_1_svc(client_message *argp, struct svc_req *rqstp)
 {
 	static server_message  result;
+  int i=0;
+  int done = 1;
+  int spin_code;
+  char *character;
+  char *answer = current_game.quiz.answer;
+  // printf("%s\n",argp->parameter );
+  // printf("%s\n",current_game.quiz.answer );
+  // printf("%s\n",current_game.answerAtMoment );
 
-	/*
-	 * insert server code here
-	 */
-
+  spin_code = atoi(strtok(argp->parameter, DELIMITER));
+  character = strtok(NULL,DELIMITER);
+  *character = lower_to_upper(*character);
+  result.opcode = 71;
+  for(i=0;i<strlen(current_game.answerAtMoment);i++) {
+    if (current_game.answerAtMoment[i]=='*'){
+      if (answer[i] == character[0]) {
+        current_game.answerAtMoment[i] = character[0];
+        result.opcode = 70;
+        current_game.joiners[0].score = get_score(spin_code, current_game.joiners[0].score);
+      }
+    }
+  }
+  //check if the answer is completed?
+  for(i=0;i<strlen(current_game.answerAtMoment);i++) {
+    if (current_game.answerAtMoment[i]=='*'){
+      done = 0;
+    }
+  }
+  if (done == 1) result.opcode = 72;
+  result.current_game = current_game;
+  // printf("answerAtMoment:%s.\n",result.current_game.answerAtMoment );
 	return &result;
 }
 

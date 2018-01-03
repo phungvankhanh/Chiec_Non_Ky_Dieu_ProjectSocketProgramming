@@ -3,7 +3,9 @@
  * These are only templates and you can use them
  * as a guideline for developing your own functions.
  */
-
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
 #include "main.h"
 #include "print.h"
 #include "validate.h"
@@ -15,6 +17,89 @@ struct Session{
     int sessStatus;// AUTHENTICATED, NOT AUTHENTICATED…
     struct sockaddr_in cliaddr;
 };
+
+void guess(int opcode, CLIENT *clnt) {
+	client_message  guess_1_arg;
+	server_message  *result_7;
+  char character;
+  char tmp[4];
+
+  printf("I think the answer contains this character (please enter only a character from 'a' to 'z'): ");
+  scanf("%c%*c",&character);
+
+  strcpy(guess_1_arg.command,"GUESS");
+  sprintf(tmp, "%d", opcode);
+  strcpy(guess_1_arg.parameter,tmp);
+  strcat(guess_1_arg.parameter,"####");
+  tmp[0] = character;tmp[1]='\0';
+  strcat(guess_1_arg.parameter,tmp);
+  result_7 = guess_1(&guess_1_arg, clnt);
+	if (result_7 == (server_message *) NULL) {
+		clnt_perror (clnt, "call failed");
+	} else {
+    if (result_7->opcode == 70) printf("Good job! The answer contains '%c'.\n", character );
+    else if (result_7->opcode == 71) printf("Oops! The answer does not contain '%c'.\n", character );
+    else if (result_7->opcode == 72) {
+      printf("Congratulation! You have complete the answer!\n");
+      sleep(2);
+    }
+
+    printf("\nToday quiz:\n    %s\n",result_7->current_game.quiz.question );
+  	int length = (int)strlen(result_7->current_game.quiz.answer);
+  	printf("The answer has %d character(s):\n    ", length);
+    printf("    %s\n",result_7->current_game.answerAtMoment );
+    printf("Your score: %d!\n",result_7->current_game.joiners[0].score );
+  }
+
+}
+
+void play_game(CLIENT *clnt) {
+	server_message  *result_5;
+	client_message  spin_1_arg;
+  char choice;
+  do {
+    menu_spin();
+    /*spin, guess all or quit game*/
+    scanf("%c%*c",&choice);
+    choice = validate_choice(&choice,'1','3');
+    switch (choice) {
+      case '1':
+        strcpy(spin_1_arg.command,"SPIN");
+        result_5 = spin_1(&spin_1_arg, clnt);
+        if (result_5 == (server_message *) NULL) {
+          clnt_perror (clnt, "call failed");
+        } else {
+          // sleep(1);
+          system("clear");
+          print_spin_result(result_5->opcode);
+          switch (result_5->opcode) {
+            case 0: guess(0,clnt); break;
+        		case 1: guess(1,clnt); break;
+        		case 2: guess(2,clnt); break;
+        		case 3: guess(3,clnt); break;
+        		case 4: guess(4,clnt); break;
+        		case 5: guess(5,clnt); break;
+        		case 6: guess(6,clnt); break;
+        		case 7: guess(7,clnt); break;
+        		case 8: guess(8,clnt); break;
+        		case 9: guess(9,clnt); break;
+        		case 10: guess(10,clnt); break;
+        		case 11: guess(11,clnt); break;
+        		case 12: guess(12,clnt); break;
+        		case 13: guess(13,clnt); break;
+        		case 14: guess(14,clnt); break;
+        		default: break;
+          }
+        }
+        break;
+      case '2':
+
+        break;
+      case '3': break;
+      default: break;
+    }
+  } while (choice!='3');
+}
 
 void
 wheel_prog_1(char *host)
@@ -46,6 +131,7 @@ wheel_prog_1(char *host)
 	client_message  function3_1_arg;
   char choice;
   struct Session session;
+  struct game current_game;
 
 #ifndef	DEBUG
 	clnt = clnt_create (host, WHEEL_PROG, V1, "tcp");
@@ -99,7 +185,7 @@ wheel_prog_1(char *host)
         }
         if (result_2->opcode == 10) {
             printf("Login successful!\n");
-            session.user = register_1_arg.current_user;
+            session.user = login_1_arg.current_user;
             session.sessStatus = AUTHENTICATED;
         }
         else if (result_2->opcode == 11){
@@ -122,24 +208,22 @@ wheel_prog_1(char *host)
         result_4 = join_1(&join_1_arg, clnt);
         if (result_4 == (server_message *) NULL) {
           clnt_perror (clnt, "call failed");
-        } else print_quiz(result_4);
-        // menu_spin();
-        // /*spin, guess all or quit game*/
-        // scanf("%c%*c",&choice);
-        // if (choice == '1') {
-        //   strcpy(spin_1_arg.command,"SPIN");
-        //   result_5 = spin_1(&spin_1_arg, clnt);
-        //   if (result_5 == (server_message *) NULL) {
-        //     clnt_perror (clnt, "call failed");
-        //   } else print_spin_result(result_5->opcode);
-        // }
+        } else {
+          print_quiz(result_4);
+          current_game = result_4->current_game;
+          play_game(clnt);
+        }
         break;
       case '2'://logout
         session.sessStatus = NOT_AUTHENTICATED;
+        strcpy(session.user.name, "");
+        strcpy(session.user.pass, "");
+        print_logout();
+        wheel_prog_1 (host);
         break;
       default: break;
     }
-  } else printf("You have not login.\n");
+  }
 
 	result_3 = logout_1(&logout_1_arg, clnt);
 	if (result_3 == (server_message *) NULL) {
@@ -150,11 +234,8 @@ wheel_prog_1(char *host)
 	if (result_6 == (server_message *) NULL) {
 		clnt_perror (clnt, "call failed");
 	}
-	result_7 = guess_1(&guess_1_arg, clnt);
-	if (result_7 == (server_message *) NULL) {
-		clnt_perror (clnt, "call failed");
-	}
-	result_8 = guess_all_1(&guess_all_1_arg, clnt);
+
+  result_8 = guess_all_1(&guess_all_1_arg, clnt);
 	if (result_8 == (server_message *) NULL) {
 		clnt_perror (clnt, "call failed");
 	}

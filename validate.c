@@ -3,8 +3,10 @@
 #include <stdbool.h>
 
 char validate_choice(char *choice, char bot, char top){
-	if ((*choice < bot)||(*choice > top)) {
-		printf("Your choice is not valid. Enter exactly your choice again:\n");
+	while ((*choice < bot)||(*choice > top)) {
+		printf("Your choice is not valid. Enter exactly your choice again: ");
+		fseek(stdin,0,SEEK_END);
+		while((getchar())!='\n');
 		scanf("%c",choice);
 	}
 	return *choice;
@@ -16,7 +18,7 @@ bool isRegisteredUsername(client_message *argp) {
     char* tokens;
     char temp[517];
     int read;
-    fp = fopen("./user.db","r");
+    fp = fopen("./database/user.db","r");
     if(fp == NULL){
 	return FALSE;
     }
@@ -39,7 +41,7 @@ bool isValidUser(client_message *argp) {
     char* tokens;
     char temp[517];
     char input[517];
-    fp = fopen("./user.db","r");
+    fp = fopen("./database/user.db","r");
     if(fp == NULL){
 	return FALSE;
     }
